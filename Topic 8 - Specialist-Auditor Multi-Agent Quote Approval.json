@@ -1,0 +1,630 @@
+{
+  "name": "Topic 8 - Specialist-Auditor Multi-Agent Quote Approval",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f78fa0be-52f7-4d9c-aa97-4be51a93dcf9",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "quote_id",
+              "value": "={{ $json.quote_id || 'Q-2026-0912' }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "customer_name",
+              "value": "={{ $json.customer_name || 'Acme Corporation' }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "product",
+              "value": "={{ $json.product || 'Enterprise Analytics Suite' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "quantity",
+              "value": "={{ $json.quantity ?? 25 }}",
+              "type": "number"
+            },
+            {
+              "id": "a5",
+              "name": "list_unit_price",
+              "value": "={{ $json.list_unit_price ?? 1200 }}",
+              "type": "number"
+            },
+            {
+              "id": "a6",
+              "name": "discount_percent",
+              "value": "={{ $json.discount_percent ?? 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "a7",
+              "name": "quote_value",
+              "value": "={{ $json.quote_value ?? 27000 }}",
+              "type": "number"
+            },
+            {
+              "id": "a8",
+              "name": "region",
+              "value": "={{ $json.region || 'North America' }}",
+              "type": "string"
+            },
+            {
+              "id": "a9",
+              "name": "payment_terms",
+              "value": "={{ $json.payment_terms || 'Net 30' }}",
+              "type": "string"
+            },
+            {
+              "id": "a10",
+              "name": "sales_rep",
+              "value": "={{ $json.sales_rep || 'J. Rivera' }}",
+              "type": "string"
+            },
+            {
+              "id": "a11",
+              "name": "notes",
+              "value": "={{ $json.notes || 'Standard renewal with volume expansion.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8ba00b7c-bed2-4730-8d1c-ae23da7ad1a9",
+      "name": "Mock Quote Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Evaluate this sales quote request as a pricing specialist.\n\nQuote ID: {{ $json.quote_id }}\nCustomer: {{ $json.customer_name }}\nProduct: {{ $json.product }}\nQuantity: {{ $json.quantity }}\nList unit price: {{ $json.list_unit_price }}\nDiscount percent: {{ $json.discount_percent }}\nStated quote value: {{ $json.quote_value }}\nRegion: {{ $json.region }}\nPayment terms: {{ $json.payment_terms }}\nNotes: {{ $json.notes }}\n\nCompute the correct discounted total, report the effective discount, list any pricing risk flags (e.g. total mismatch, unusually high discount, extended payment terms), summarize concisely, and give a preliminary recommendation.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Evaluator Agent, a pricing specialist in a multi-agent quote-approval system. Your job is ONLY to analyze and characterize the quote (math, discount, risks) — you do NOT make the final approval decision; a separate Auditor Agent does. Be objective and concise. Always return output matching the required JSON schema.",
+          "maxIterations": 5
+        }
+      },
+      "id": "f79fd937-5ee0-4ce7-a211-a9d18c4fa01f",
+      "name": "Evaluator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 512,
+          "temperature": 0
+        }
+      },
+      "id": "e9d3ed8a-20f5-444e-97e0-5b8c6e1d7bb5",
+      "name": "Evaluator Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GyUgk15GB3craAwS",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"calculated_total\":{\"type\":\"number\",\"description\":\"quantity * list_unit_price * (1 - discount_percent/100)\"},\"effective_discount_percent\":{\"type\":\"number\"},\"evaluator_recommendation\":{\"type\":\"string\",\"enum\":[\"APPROVE\",\"REVIEW\"]},\"risk_flags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"evaluation_summary\":{\"type\":\"string\"}},\"required\":[\"calculated_total\",\"effective_discount_percent\",\"evaluator_recommendation\",\"risk_flags\",\"evaluation_summary\"],\"additionalProperties\":false}"
+      },
+      "id": "2bb4d57d-d704-4276-bd91-d8f5a6e264ac",
+      "name": "Evaluator Output Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "quote_id",
+              "value": "={{ $(\"Mock Quote Request\").item.json.quote_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "customer_name",
+              "value": "={{ $(\"Mock Quote Request\").item.json.customer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "product",
+              "value": "={{ $(\"Mock Quote Request\").item.json.product }}",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "quantity",
+              "value": "={{ $(\"Mock Quote Request\").item.json.quantity }}",
+              "type": "number"
+            },
+            {
+              "id": "c5",
+              "name": "discount_percent",
+              "value": "={{ $(\"Mock Quote Request\").item.json.discount_percent }}",
+              "type": "number"
+            },
+            {
+              "id": "c6",
+              "name": "quote_value",
+              "value": "={{ $(\"Mock Quote Request\").item.json.quote_value }}",
+              "type": "number"
+            },
+            {
+              "id": "c7",
+              "name": "region",
+              "value": "={{ $(\"Mock Quote Request\").item.json.region }}",
+              "type": "string"
+            },
+            {
+              "id": "c8",
+              "name": "payment_terms",
+              "value": "={{ $(\"Mock Quote Request\").item.json.payment_terms }}",
+              "type": "string"
+            },
+            {
+              "id": "c9",
+              "name": "evaluator_recommendation",
+              "value": "={{ $json.output.evaluator_recommendation }}",
+              "type": "string"
+            },
+            {
+              "id": "c10",
+              "name": "evaluator_calculated_total",
+              "value": "={{ $json.output.calculated_total }}",
+              "type": "number"
+            },
+            {
+              "id": "c11",
+              "name": "evaluator_effective_discount",
+              "value": "={{ $json.output.effective_discount_percent }}",
+              "type": "number"
+            },
+            {
+              "id": "c12",
+              "name": "evaluator_summary",
+              "value": "={{ $json.output.evaluation_summary }}",
+              "type": "string"
+            },
+            {
+              "id": "c13",
+              "name": "evaluator_risk_flags",
+              "value": "={{ $json.output.risk_flags }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e363adb7-c5dc-400d-ae8b-f7d215796c36",
+      "name": "Context Handoff",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        800,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Audit this quote against the business rules and return a final decision of exactly APPROVED or MANUAL_REVIEW.\n\nQuote ID: {{ $json.quote_id }}\nCustomer: {{ $json.customer_name }}\nProduct: {{ $json.product }}\nQuantity: {{ $json.quantity }}\nDiscount percent: {{ $json.discount_percent }}\nQuote value: {{ $json.quote_value }}\nRegion: {{ $json.region }}\nPayment terms: {{ $json.payment_terms }}\nEvaluator recommendation: {{ $json.evaluator_recommendation }}\nEvaluator calculated total: {{ $json.evaluator_calculated_total }}\nEvaluator effective discount: {{ $json.evaluator_effective_discount }}\nEvaluator summary: {{ $json.evaluator_summary }}\nEvaluator risk flags: {{ $json.evaluator_risk_flags }}\n\nApply these business rules:\n1. Discount percent must be <= 20%.\n2. Quote value must be <= 50000.\n3. Payment terms must be one of: Prepaid, Net 15, Net 30.\n4. Quantity must be greater than 0.\n5. Evaluator calculated total must match the stated quote value (within 1%).\nIf ALL rules pass, decision = APPROVED. If ANY rule fails, decision = MANUAL_REVIEW and list each violation.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Auditor Agent, an independent compliance auditor in a multi-agent quote-approval system. You receive structured context produced by the Evaluator Agent and enforce the business rules strictly. The decision field MUST be exactly \"APPROVED\" or \"MANUAL_REVIEW\" — never any other value. When uncertain or when data is missing or inconsistent, choose MANUAL_REVIEW. Always return output matching the required JSON schema.",
+          "maxIterations": 5
+        }
+      },
+      "id": "d10761e4-d713-4495-bb43-000b5121e5b3",
+      "name": "Auditor Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1024,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 512,
+          "temperature": 0
+        }
+      },
+      "id": "45e0bf80-1604-4898-9fd1-83a5ea5805ac",
+      "name": "Auditor Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GyUgk15GB3craAwS",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"decision\":{\"type\":\"string\",\"enum\":[\"APPROVED\",\"MANUAL_REVIEW\"]},\"rule_violations\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reasons\":{\"type\":\"string\"}},\"required\":[\"decision\",\"rule_violations\",\"reasons\"],\"additionalProperties\":false}"
+      },
+      "id": "421c9cdd-0a34-4bac-bc21-c92a17e111e9",
+      "name": "Auditor Output Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1168,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const auditor = ($json.output && typeof $json.output === \"object\") ? $json.output : {};\nconst ctx = $(\"Context Handoff\").item.json;\n\n// Normalize raw auditor decision\nconst rawDecision = typeof auditor.decision === \"string\" ? auditor.decision.trim().toUpperCase() : \"\";\nconst isValidDecision = rawDecision === \"APPROVED\" || rawDecision === \"MANUAL_REVIEW\";\n\n// Deterministic business-rule validation (fail-safe guard)\nconst MAX_DISCOUNT = 20;\nconst MAX_QUOTE_VALUE = 50000;\nconst ALLOWED_TERMS = [\"PREPAID\", \"NET 15\", \"NET 30\"];\n\nconst discount = Number(ctx.discount_percent);\nconst quoteValue = Number(ctx.quote_value);\nconst quantity = Number(ctx.quantity);\nconst terms = String(ctx.payment_terms || \"\").trim().toUpperCase();\nconst evalTotal = Number(ctx.evaluator_calculated_total);\n\nconst violations = [];\nif (!Number.isFinite(discount) || discount > MAX_DISCOUNT) violations.push(\"discount_percent exceeds 20% or invalid\");\nif (!Number.isFinite(quoteValue) || quoteValue > MAX_QUOTE_VALUE) violations.push(\"quote_value exceeds 50000 or invalid\");\nif (!ALLOWED_TERMS.includes(terms)) violations.push(\"payment_terms not in allowed list\");\nif (!Number.isFinite(quantity) || quantity <= 0) violations.push(\"quantity must be greater than 0\");\nif (!Number.isFinite(evalTotal) || (Number.isFinite(quoteValue) && quoteValue > 0 && Math.abs(evalTotal - quoteValue) / quoteValue > 0.01)) violations.push(\"calculated total does not match quote value\");\n\nconst hardRulesPass = violations.length === 0;\n\n// Final decision logic:\n// - Invalid/malformed auditor output -> MANUAL_REVIEW (never Approved)\n// - Auditor said APPROVED but hard rules fail -> MANUAL_REVIEW (safety override)\n// - Otherwise honor a valid auditor decision\nlet finalDecision;\nlet decisionReason;\nif (!isValidDecision) {\n  finalDecision = \"MANUAL_REVIEW\";\n  decisionReason = \"Auditor output missing or malformed; routed to manual review by fail-safe guard.\";\n} else if (rawDecision === \"APPROVED\" && !hardRulesPass) {\n  finalDecision = \"MANUAL_REVIEW\";\n  decisionReason = \"Auditor approved but deterministic business-rule validation failed; overridden to manual review.\";\n} else {\n  finalDecision = rawDecision;\n  decisionReason = typeof auditor.reasons === \"string\" ? auditor.reasons : \"\";\n}\n\nreturn {\n  quote_id: ctx.quote_id,\n  customer_name: ctx.customer_name,\n  final_decision: finalDecision,\n  auditor_decision_raw: rawDecision || null,\n  auditor_valid: isValidDecision,\n  hard_rules_pass: hardRulesPass,\n  hard_rule_violations: violations,\n  auditor_rule_violations: Array.isArray(auditor.rule_violations) ? auditor.rule_violations : [],\n  decision_reason: decisionReason,\n  quote_value: quoteValue,\n  discount_percent: discount,\n  payment_terms: ctx.payment_terms,\n};"
+      },
+      "id": "85b03d17-9494-48d3-82f9-ed388a1658da",
+      "name": "Auditor Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d1",
+              "leftValue": "={{ $json.final_decision }}",
+              "rightValue": "APPROVED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c9604199-11c2-4bf7-ad1c-2a91ea66f007",
+      "name": "Is Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "queue",
+              "value": "APPROVED_QUEUE",
+              "type": "string"
+            },
+            {
+              "id": "p2",
+              "name": "quote_id",
+              "value": "={{ $json.quote_id }}",
+              "type": "string"
+            },
+            {
+              "id": "p3",
+              "name": "customer_name",
+              "value": "={{ $json.customer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "p4",
+              "name": "final_decision",
+              "value": "={{ $json.final_decision }}",
+              "type": "string"
+            },
+            {
+              "id": "p5",
+              "name": "decision_reason",
+              "value": "={{ $json.decision_reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "785dcc8d-afdf-4fcc-b786-4a0b7c846b9c",
+      "name": "Approved Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1824,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "queue",
+              "value": "MANUAL_REVIEW_QUEUE",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "quote_id",
+              "value": "={{ $json.quote_id }}",
+              "type": "string"
+            },
+            {
+              "id": "m3",
+              "name": "customer_name",
+              "value": "={{ $json.customer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "final_decision",
+              "value": "={{ $json.final_decision }}",
+              "type": "string"
+            },
+            {
+              "id": "m5",
+              "name": "decision_reason",
+              "value": "={{ $json.decision_reason }}",
+              "type": "string"
+            },
+            {
+              "id": "m6",
+              "name": "hard_rule_violations",
+              "value": "={{ $json.hard_rule_violations }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3327bd8e-2d30-433e-99f7-657d592f571d",
+      "name": "Manual Review Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1824,
+        208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Mock Quote Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Quote Request": {
+      "main": [
+        [
+          {
+            "node": "Evaluator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluator Agent": {
+      "main": [
+        [
+          {
+            "node": "Context Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluator Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Evaluator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluator Output Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Evaluator Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Handoff": {
+      "main": [
+        [
+          {
+            "node": "Auditor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auditor Agent": {
+      "main": [
+        [
+          {
+            "node": "Auditor Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auditor Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auditor Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auditor Output Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auditor Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auditor Decision": {
+      "main": [
+        [
+          {
+            "node": "Is Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Approved?": {
+      "main": [
+        [
+          {
+            "node": "Approved Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manual Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "35bb0737-63cf-44ed-8746-1875bc7f1edf",
+  "meta": {
+    "instanceId": "6abe9931809978352319cb21622ffdff38accce530bfc6c488633e9f18461d78"
+  },
+  "nodeGroups": [
+    {
+      "id": "b54653d3-11e8-4018-9198-cedc4047abed",
+      "name": "Specialist Evaluation",
+      "nodeIds": [
+        "f79fd937-5ee0-4ce7-a211-a9d18c4fa01f",
+        "e9d3ed8a-20f5-444e-97e0-5b8c6e1d7bb5",
+        "2bb4d57d-d704-4276-bd91-d8f5a6e264ac"
+      ],
+      "description": "Evaluator Agent (Gemini) analyzes the quote: math, discount, and risk flags."
+    },
+    {
+      "id": "ed77c7d1-03fd-4584-83a2-52b21d457c41",
+      "name": "Independent Audit",
+      "nodeIds": [
+        "d10761e4-d713-4495-bb43-000b5121e5b3",
+        "45e0bf80-1604-4898-9fd1-83a5ea5805ac",
+        "421c9cdd-0a34-4bac-bc21-c92a17e111e9"
+      ],
+      "description": "Auditor Agent (Gemini) independently enforces business rules and decides APPROVED or MANUAL_REVIEW."
+    },
+    {
+      "id": "c0c407fc-a9ba-4cc7-a0d9-929ff0323124",
+      "name": "Decision & Routing",
+      "nodeIds": [
+        "85b03d17-9494-48d3-82f9-ed388a1658da",
+        "c9604199-11c2-4bf7-ad1c-2a91ea66f007",
+        "785dcc8d-afdf-4fcc-b786-4a0b7c846b9c",
+        "3327bd8e-2d30-433e-99f7-657d592f571d"
+      ],
+      "description": "Fail-safe normalization of the auditor decision, then IF routing to the correct queue."
+    }
+  ],
+  "id": "b0DJHG4g8XzZ7deQ",
+  "tags": []
+}
